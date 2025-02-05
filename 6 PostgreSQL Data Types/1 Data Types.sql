@@ -1,0 +1,257 @@
+----------------------------------------------------------------------------------------------------
+-- [1] Boolean
+CREATE TABLE TABLE_BOOLEAN (
+	PRODUCT_ID SERIAL PRIMARY KEY,
+	IS_AVAILABLE BOOLEAN NOT NULL
+);
+
+DELETE FROM TABLE_BOOLEAN;
+
+INSERT INTO
+	TABLE_BOOLEAN (IS_AVAILABLE)
+VALUES
+	(FALSE),
+	(TRUE),
+	('y'),
+	('n'),
+	('0'),
+	('1'),
+	('no'),
+	('yes'),
+	('true'),
+	('false');
+
+SELECT
+	*
+FROM
+	TABLE_BOOLEAN;
+
+SELECT
+	*
+FROM
+	TABLE_BOOLEAN
+WHERE
+	IS_AVAILABLE = TRUE;
+
+SELECT
+	*
+FROM
+	TABLE_BOOLEAN
+WHERE
+	IS_AVAILABLE;
+
+SELECT
+	*
+FROM
+	TABLE_BOOLEAN
+WHERE
+	NOT IS_AVAILABLE = TRUE;
+
+ALTER TABLE TABLE_BOOLEAN
+ALTER COLUMN IS_AVAILABLE
+SET DEFAULT FALSE;
+
+INSERT INTO
+	TABLE_BOOLEAN (PRODUCT_ID)
+VALUES
+	(23);
+
+----------------------------------------------------------------------------------------------------
+-- [2] character data type
+-- [2.1] char(n) and character(n)
+SELECT
+	CAST('DEEP' AS CHARACTER(10)) AS "Name";
+
+"DEEP      "
+SELECT
+	'Deep'::CHAR(10) AS "name";
+
+"Deep      "
+SELECT
+	CAST('Deep' AS CHARACTER(10)) AS "Name1",
+	'Deep'::CHAR(10) AS "Name2";
+
+"Deep      " "Deep      "
+-- [2.2] varChar(n)
+SELECT
+	'Deep'::VARCHAR(10) AS "Name";
+
+"Deep"
+SELECT
+	'This is a test statement'::CHARACTER VARYING(10) AS "Statement";
+
+"This is a "
+SELECT
+	'This is a test statement'::VARCHAR AS "Statement";
+
+"This is a test statement"
+-- [2.3] text
+SELECT
+	'This is a test statement'::TEXT AS "Statement";
+
+CREATE TABLE CHARACTERS (
+	COL_CHAR CHAR(10),
+	COL_VARCHAR VARCHAR(10),
+	COL_TEXT TEXT
+);
+
+INSERT INTO
+	CHARACTERS (COL_CHAR, COL_VARCHAR, COL_TEXT)
+VALUES
+	('abc', 'abc', 'abc'),
+	('xyz', 'xyz', 'xyz');
+
+SELECT
+	*
+FROM
+	CHARACTERS;
+
+"abc       " "abc" "abc";
+
+"xyz       " "xyz" "xyz";
+
+----------------------------------------------------------------------------------------------------
+-- [3] Numeric data types
+-- [3.1] integer
+CREATE TABLE SERIAL (
+	COL_SMALLINT SMALLINT,
+	COL_INT INT,
+	COL_BIGINT BIGINT,
+	COL_SMALLSERIAL SMALLSERIAL,
+	COL_SERIAL SERIAL PRIMARY KEY,
+	COL_BIGSERIAL BIGSERIAL,
+	PRODUCT_NAME VARCHAR(100)
+);
+
+INSERT INTO
+	SERIAL (COL_SMALLINT, COL_INT, COL_BIGINT, PRODUCT_NAME)
+VALUES
+	(1, 1, 1, 'pen'),
+	(2, 2, 2, 'pencil'),
+	(3, 3, 3, 'erasor');
+
+SELECT
+	*
+FROM
+	SERIAL;
+
+-- [3.2] decimal
+CREATE TABLE DECIMAL(
+	COL_NUMERIC NUMERIC(20, 5),
+	COL_DECIMAL DECIMAL(20, 3),
+	COL_REAL REAL,
+	COL_DOUBLE DOUBLE PRECISION
+);
+
+INSERT INTO
+	DECIMAL(COL_NUMERIC, COL_DECIMAL, COL_REAL, COL_DOUBLE)
+VALUES
+	(.9, .9, .9, .9),
+	(3.13579, 3.13579, 3.13579, 3.13579),
+	(
+		4.135787654,
+		4.135787654,
+		4.135787654,
+		4.135787654
+	);
+
+SELECT
+	*
+FROM
+	DECIMAL;
+
+0.90000 0.900 0.9 0.9;
+
+3.13579 3.136 3.13579 3.13579;
+
+4.13579 4.136 4.1357875 4.135787654;
+
+----------------------------------------------------------------------------------------------------
+-- [4] Date/Time data types
+-- [4.1] Date
+CREATE TABLE DATES (
+	ID SERIAL PRIMARY KEY,
+	EMPLOYEE_NAME VARCHAR(100) NOT NULL,
+	HIRED_DATE DATE NOT NULL,
+	ADD_DATE DATE DEFAULT CURRENT_DATE
+);
+
+INSERT INTO
+	DATES (EMPLOYEE_NAME, HIRED_DATE)
+VALUES
+	('Adam', '2020-01-01'),
+	('Linda', '2020-02-01');
+
+SELECT
+	*
+FROM
+	DATES;
+
+SELECT
+	CURRENT_DATE;
+
+SELECT
+	NOW();
+
+-- [4.2] TIME
+CREATE TABLE TABLE_TIME (
+	ID SERIAL PRIMARY KEY,
+	CLASS_NAME VARCHAR(100) NOT NULL,
+	START_TIME TIME NOT NULL,
+	END_TIME TIME NOT NULL
+);
+
+SELECT
+	*
+FROM
+	TABLE_TIME;
+
+INSERT INTO
+	TABLE_TIME (CLASS_NAME, START_TIME, END_TIME)
+VALUES
+	('Math', '08:00:00', '09:00:00'),
+	('Chemistry', '09:01:00', '10:00:00');
+
+SELECT
+	CURRENT_TIME;
+
+SELECT
+	CURRENT_TIME(4);
+
+SELECT
+	LOCALTIME(4),
+	CURRENT_TIME(4);
+
+SELECT
+	LOCALTIME(4),
+	LOCALTIME;
+
+SELECT
+	TIME '10:00' - TIME '04:00' AS RESULT;
+
+SELECT
+	CURRENT_TIME,
+	CURRENT_TIME + INTERVAL '-2 hours' AS "Updated Time";
+
+-- [4.3] TIMESTAMP, TIMESTAMPTZ
+CREATE TABLE TABLE_TIME_TZ (TS TIMESTAMP, TSTZ TIMESTAMPTZ);
+
+INSERT INTO
+	TABLE_TIME_TZ (TS, TSTZ)
+VALUES
+	(
+		'2020-02-22 10:10:10-07',
+		'2020-02-22 10:10:10-07'
+	);
+
+SELECT
+	*
+FROM
+	TABLE_TIME_TZ;
+
+SHOW TIMEZONE;
+SELECT
+	TIMEZONE ('Asia/Singapore', '2020-01-01 02:00:00');
+
+SELECT
+	TIMEZONE ('America/New_York', '2020-01-01 02:00:00');

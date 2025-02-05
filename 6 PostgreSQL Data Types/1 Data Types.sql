@@ -250,8 +250,203 @@ FROM
 	TABLE_TIME_TZ;
 
 SHOW TIMEZONE;
+
 SELECT
 	TIMEZONE ('Asia/Singapore', '2020-01-01 02:00:00');
 
 SELECT
 	TIMEZONE ('America/New_York', '2020-01-01 02:00:00');
+
+----------------------------------------------------------------------------------------------------
+-- [5] UUID
+-- 32 digits
+-- hexadecimal digits
+-- separated by hyphens
+-- we will use uuid-ossp to generate uuid
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+SELECT
+	UUID_GENERATE_V1 ();
+
+-- this version of uuid generator uses mac address, currenet time stamp and some random numbers to generate unique id, each time
+SELECT
+	UUID_GENERATE_V4 ();
+
+-- this version of uuid generator does not use anything like mac address, current time stamp in order to generate this uuid
+-- id being generated is completely random
+CREATE TABLE TABLE_UUID (
+	PRODUCT_ID UUID DEFAULT UUID_GENERATE_V1 (),
+	PRODUCT_NAME VARCHAR(100) NOT NULL
+);
+
+SELECT
+	*
+FROM
+	TABLE_UUID;
+
+INSERT INTO
+	TABLE_UUID (PRODUCT_NAME)
+VALUES
+	('abc'),
+	('def'),
+	('ghi'),
+	('jkl'),
+	('mno'),
+	('pqr'),
+	('stu'),
+	('vwx'),
+	('yz');
+
+ALTER TABLE TABLE_UUID
+ALTER COLUMN PRODUCT_ID
+SET DEFAULT UUID_GENERATE_V4 ();
+
+----------------------------------------------------------------------------------------------------
+-- [6] Array
+CREATE TABLE TABLE_ARRAY (ID SERIAL, NAME VARCHAR(100), PHONES TEXT[]);
+
+INSERT INTO
+	TABLE_ARRAY (NAME, PHONES)
+VALUES
+	('Adam', ARRAY['(801)-123-4567', '(819)-555-2222']),
+	(
+		'Linda',
+		ARRAY['(201)-123-4567', '(214)-222-3333']
+	);
+
+SELECT
+	*
+FROM
+	TABLE_ARRAY;
+
+SELECT
+	NAME,
+	PHONES[1]
+FROM
+	TABLE_ARRAY;
+
+SELECT
+	NAME
+FROM
+	TABLE_ARRAY
+WHERE
+	PHONES[2] = '(214)-222-3333';
+
+----------------------------------------------------------------------------------------------------
+-- [7] hstore
+/*
+1. hstore is a datatype that stores value in a key value pair
+2. hstore module implements the hstore data type
+3. the keys and values are just text strings only
+4. if there is a requirement of adding any aditional data, then it is possible to do so using the hstore
+*/
+CREATE EXTENSION IF NOT EXISTS HSTORE;
+
+CREATE TABLE TABLE_HSTORE (
+	BOOK_ID SERIAL PRIMARY KEY,
+	TITLE VARCHAR(100) NOT NULL,
+	BOOK_INFO HSTORE
+);
+
+INSERT INTO
+	TABLE_HSTORE (TITLE, BOOK_INFO)
+VALUES
+	(
+		'Title 2',
+		'
+		"publisher" => "bcd",
+		"paper cost" => "20.00",
+		"e_cost" => "5.86"		
+	'
+	);
+
+SELECT
+	*
+FROM
+	TABLE_HSTORE;
+
+SELECT
+	BOOK_INFO -> 'publisher' AS "PUBLISHER",
+	BOOK_INFO -> 'e_cost' AS "Electronic Cost"
+FROM
+	TABLE_HSTORE;
+
+----------------------------------------------------------------------------------------------------
+-- [8] JSON
+CREATE TABLE TABLE_JSON (ID SERIAL PRIMARY KEY, DOCS JSON);
+
+SELECT
+	*
+FROM
+	TABLE_JSON;
+
+INSERT INTO
+	TABLE_JSON (DOCS)
+VALUES
+	('[1, 2, 3, 4, 5, 6]'),
+	('[2, 3, 4, 5, 6, 7]'),
+	('{"key": "value"}');
+
+SELECT
+	DOCS
+FROM
+	TABLE_JSON;
+
+SELECT
+	*
+FROM
+	TABLE_JSON
+WHERE
+	DOCS @> '2';
+
+ALTER TABLE TABLE_JSON
+ALTER COLUMN DOCS TYPE JSONB;
+
+INSERT INTO
+	TABLE_JSON (DOCS)
+VALUES
+	('{"2": "value"}');
+
+CREATE INDEX ON TABLE_JSON USING GIN (DOCS JSONB_PATH_OPS);
+
+--  after running above query, fetching json data will be much faster, as of it using the GIN indexing
+----------------------------------------------------------------------------------------------------
+-- [9] Network Addresses
+CREATE TABLE TABLE_NETADDR (ID SERIAL PRIMARY KEY, IP INET);
+
+INSERT INTO
+	TABLE_NETADDR (IP)
+VALUES
+	('4.35.221.243'),
+	('4.152.207.126'),
+	('4.152.207.238'),
+	('4.249.111.162'),
+	('12.1.223.132'),
+	('12.8.192.60');
+
+SELECT
+	*
+FROM
+	TABLE_NETADDR;
+
+SELECT
+	IP,
+	SET_MASKLEN(IP, 24) AS INET_24
+FROM
+	TABLE_NETADDR;
+
+SELECT
+	IP,
+	SET_MASKLEN(IP, 24) AS INET_24,
+	SET_MASKLEN(IP::CIDR, 24) AS CIDR_24
+FROM
+	TABLE_NETADDR;
+
+SELECT
+	IP,
+	SET_MASKLEN(IP, 24) AS INET_24,
+	SET_MASKLEN(IP::CIDR, 24) AS CIDR_24,
+	SET_MASKLEN(IP::CIDR, 27) AS CIDR_27,
+	SET_MASKLEN(IP::CIDR, 27) AS CIDR_28
+FROM
+	TABLE_NETADDR;

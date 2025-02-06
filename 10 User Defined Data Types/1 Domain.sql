@@ -87,7 +87,7 @@ VALUES
 INSERT INTO
 	COLORS (COLOR)
 VALUES
-	('red');
+	('RED');
 
 SELECT
 	*
@@ -99,4 +99,23 @@ CREATE DOMAIN USER_STATUS VARCHAR(10) CHECK (VALUE IN ('ENABLE', 'DISABLE', 'TEM
 CREATE TABLE USERS_CHECK (STATUS USER_STATUS);
 
 ----------------------------------------------------------------------------------------------------
--- get all domains in a schema
+-- GET ALL DOMAINS IN A SCHEMA
+SELECT
+	TYPNAME
+FROM
+	PG_CATALOG.PG_TYPE
+	JOIN PG_CATALOG.PG_NAMESPACE ON PG_NAMESPACE.OID = PG_TYPE.TYPNAMESPACE
+WHERE
+	TYPTYPE = 'D'
+	AND NSPNAME = 'PUBLIC';
+
+----------------------------------------------------------------------------------------------------
+-- drop domain
+
+drop domain positive_numeric;
+
+drop domain positive_numeric cascade;
+
+drop domain valid_color;
+
+drop domain valid_color cascade;

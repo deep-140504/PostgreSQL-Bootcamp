@@ -5,17 +5,20 @@ SELECT
 SELECT
 	RELEASE_DATE,
 	TO_CHAR(RELEASE_DATE, 'DD-MM-YYYY'),
-	TO_CHAR(RELEASE_DATE, 'DY, MM, YYYY')
+	TO_CHAR(RELEASE_DATE, 'DY, MM, YYYY'),
+	TO_CHAR(RELEASE_DATE, 'DD, MM, YYYY')
 FROM
 	MOVIES;
 
+-- here it requires of explicit type cast from string to timestamp
 SELECT
 	TO_CHAR(TIMESTAMP '2020-01-01 10:30:45', 'HH24:MI:SS');
 
 SELECT
 	MOVIE_ID,
 	REVENUES_DOMESTIC,
-	TO_CHAR(REVENUES_DOMESTIC, '$999D99')
+	TO_CHAR(REVENUES_DOMESTIC, '$999D99'),
+	TO_CHAR(REVENUES_DOMESTIC, '$999.99')
 FROM
 	MOVIES_REVENUES;
 
@@ -39,14 +42,20 @@ SELECT
 	TO_NUMBER('$1,978,299.78', 'L9G999G999D99');
 
 -- TO_DATE FUNCTION
+-- to date functions converts the corresponding format into yyyy-mm-dd format
+-- so in the function second arguments specifies the pattern of the first argument
 SELECT
 	TO_DATE('2020/10/22', 'YYYY/MM/DD');
 
+-- in below two examples, it converts 20 to 2020 and 99 to 1999, so it is smart enough to understand what value to put 
 SELECT
-	TO_DATE('022199', 'MMDDYY');
+	TO_DATE('102220', 'MMDDYY');
 
 SELECT
-	TO_DATE('March 07, 2019', 'Month DD, YYYY');
+	TO_DATE('102299', 'MMDDYY');
 
 SELECT
-	TO_DATE('2020/02/29', 'YYYY/MM/DD');
+	TO_DATE('October 22, 2020', 'Month DD, YYYY');
+
+SELECT
+	TO_DATE('2020/10/22', 'YYYY/MM/DD');

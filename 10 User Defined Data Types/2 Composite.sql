@@ -1,3 +1,12 @@
+----------------------------------------------------------------------------------------------------
+-- BASIC SYNTAX
+CREATE TYPE type_name AS (
+    column1 data_type,
+    column2 data_type,
+    column3 data_type
+);
+
+----------------------------------------------------------------------------------------------------
 -- COMPOSITE DATA TYPES
 -- COMPOSITE TYPE FOR ADDRESS
 CREATE TYPE ADDRESS AS (CITY VARCHAR(50), COUNTR VARCHAR(50));
@@ -33,6 +42,11 @@ CREATE TYPE ADDRESS_NEW AS (
 
 ALTER TABLE COMPANIES
 ALTER COLUMN ADDRESS TYPE ADDRESS_NEW USING ADDRESS::TEXT::ADDRESS_NEW;
+
+-- ALTERNATIVE SYNTAX
+ALTER TABLE employees 
+ALTER COLUMN personal_details TYPE person_info_v2 USING personal_details::person_info_v2;
+
 
 DROP TYPE ADDRESS;
 

@@ -1,4 +1,11 @@
 ----------------------------------------------------------------------------------------------------
+-- BASIC SYNTAX
+CREATE DOMAIN domain_name AS data_type
+DEFAULT default_value
+NOT NULL
+CHECK (condition);
+
+----------------------------------------------------------------------------------------------------
 -- CREATE A DOMAIN DATA TYPE, CREATE AN ADDRESS
 CREATE DOMAIN ADDR VARCHAR(100) NOT NULL;
 

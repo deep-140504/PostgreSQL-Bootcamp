@@ -593,3 +593,49 @@ FROM
 	DIRECTOR_DOCS
 WHERE
 	(BODY ->> 'director_id')::INTEGER IN (1, 2, 3, 4, 5, 10);
+
+----------------------------------------------------------------------------------------------------
+-- Indexing on JSONB
+SELECT
+	*
+FROM
+	CONTACTS_DOCS;
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	CONTACTS_DOCS
+WHERE
+	BODY @> '{"first_name" : "John"}';
+
+CREATE INDEX IDX_GIN_CONTACTS_DOCS_BODY ON CONTACTS_DOCS USING GIN (BODY);
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	CONTACTS_DOCS
+WHERE
+	BODY @> '{"first_name" : "John"}';
+
+SELECT
+	PG_SIZE_PRETTY(
+		PG_RELATION_SIZE('idx_gin_contacts_docs_body'::REGCLASS)
+	) AS "Index Size";
+
+CREATE INDEX IDX_GIN_CONTACTS_DOCS_BODY_COOL ON CONTACTS_DOCS USING GIN (BODY JSONB_PATH_OPS);
+
+SELECT
+	PG_SIZE_PRETTY(
+		PG_RELATION_SIZE('idx_gin_contacts_docs_body_cool'::REGCLASS)
+	) AS "Index Size";
+
+CREATE INDEX IDX_GIN_CONTACTS_DOCS_BODY_FNAME ON CONTACTS_DOCS USING GIN ((BODY -> 'first_name') JSONB_PATH_OPS);
+
+SELECT
+	PG_SIZE_PRETTY(
+		PG_RELATION_SIZE('idx_gin_contacts_docs_body_fname'::REGCLASS)
+	) AS "Index Size";

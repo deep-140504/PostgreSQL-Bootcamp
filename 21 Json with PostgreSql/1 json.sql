@@ -1,0 +1,595 @@
+-- THIS IS A TEXT OBJECT
+SELECT
+	'{"TITLE": "HARRY POTTER AND THE GOBLET OF FIRE"}';
+
+-- SO IT REQUIRED TO CAST THE SAME AS A JSON OBJECT
+SELECT
+	'{"TITLE": "HARRY POTTER AND THE GOBLET OF FIRE"}'::JSON;
+
+-- TAKE A LOOK THAT ON TYPE CASTING JSON STRING AS A JSON OBJECT, IT CONSIDERS THE WHITE SPACES;
+SELECT
+	'{
+	"TITLE": "HARRY POTTER AND THE GOBLET OF FIRE"
+}'::JSON;
+
+"{
+	""TITLE"": ""HARRY POTTER AND THE GOBLET OF FIRE""
+}"
+-- IF NOT REQUIRED KEEPING THE WHITE SPACES IN THE JSON OBJECT THEN, TYPECASTE THE JSON STRING AS JSONB
+SELECT
+	'{
+	"TITLE": "HARRY POTTER AND THE GOBLET OF FIRE",
+	"AUTHOR": "J. K. ROWLINGS"
+}'::JSONB;
+
+----------------------------------------------------------------------------------------------------
+-- Create our first table with JSONB data type
+CREATE TABLE BOOKS (BOOK_ID SERIAL PRIMARY KEY, BOOK_INFO JSONB);
+
+INSERT INTO
+	BOOKS (BOOK_INFO)
+VALUES
+	(
+		'{"TITLE": "BOOK TITLE", "AUTHOR": "DEEP"}'::JSONB
+	),
+	(
+		'{"TITLE": "BOOK TITLE2", "AUTHOR": "AUTHOR2"}'::JSONB
+	),
+	(
+		'{"TITLE": "BOOK TITLE3", "AUTHOR": "AUTHOR3"}'::JSONB
+	),
+	(
+		'{"TITLE": "BOOK TITLE4", "AUTHOR": "AUTHOR4"}'::JSONB
+	);
+
+SELECT
+	*
+FROM
+	BOOKS;
+
+SELECT
+	BOOK_INFO -> 'TITLE' -- NOT THAT, EVEN AFTER THE TITLE ATTRIBUTE BEING IN AN UPPERCASE, IT IS INSIDE THE SINGLE QUOTE, RATHER BEING IN ""
+FROM
+	BOOKS;
+
+-- THIS IS SAME AS PREVIOUS ONE, BUT ->> OPERATOR DOES NOT PRINTS THE "" AROUND THE STRING
+SELECT
+	BOOK_INFO ->> 'TITLE' TITLE,
+	BOOK_INFO ->> 'AUTHOR' AUTHOR
+FROM
+	BOOKS
+WHERE
+	BOOK_INFO ->> 'AUTHOR' = 'AUTHOR1';
+
+----------------------------------------------------------------------------------------------------
+-- Update and Delete JSON Data
+-- || CONCATENATION OPERATION WILL BE USED TO UPDATE THE RECORDS OF THE JSON OBJECT IN PSQL
+UPDATE BOOKS
+SET
+	BOOK_INFO = BOOK_INFO
+WHERE
+	BOOK_INFO -> 'AUTHOR' = "AUTHOR10";
+
+-- ("THIS CAN ALSO BE USED")
+UPDATE BOOKS
+SET
+	BOOK_INFO = JSONB_SET(BOOK_INFO, '{TITLE}', '"NEW TITLE"')
+WHERE
+	BOOK_INFO ->> 'AUTHOR' = 'AUTHOR10';
+
+-- UPDATE USING CONCATENATION OPERATOR (THIS IS THE CORRECT VERSION)
+UPDATE BOOKS
+SET
+	BOOK_INFO = BOOK_INFO || '{"AUTHOR":"DEEP"}'
+WHERE
+	BOOK_INFO ->> 'AUTHOR' = 'AUTHOR10';
+
+SELECT
+	*
+FROM
+	BOOKS;
+
+UPDATE BOOKS
+SET
+	BOOK_INFO = BOOK_INFO || '{"CATEGORY": "SCIENCE", "PAGES": 250}'
+WHERE
+	BOOK_INFO ->> 'TITLE' = 'BOOK TITLE';
+
+UPDATE BOOKS
+SET
+	BOOK_INFO = BOOK_INFO - 'PAGES'
+WHERE
+	BOOK_INFO ->> 'AUTHOR' != 'DEEP'
+RETURNING
+	*;
+
+UPDATE BOOKS
+SET
+	BOOK_INFO = BOOK_INFO || '{"AVAILABILITY": ["INDIA", "NEPAL", "SRI LANKA"]}'
+WHERE
+	BOOK_INFO ->> 'AUTHOR' = 'DEEP'
+RETURNING
+	*;
+
+----------------------------------------------------------------------------------------------------
+-- Create JSON from tables
+-- DIRECTORS TABLE INTO THE JSON FORMAT
+SELECT
+	*
+FROM
+	DIRECTORS;
+
+-- USING BELOW MENTIONED CODE, IT IS EASY TO CONVERT THE TABLE ROWS TO THE JSON DATA FORMAT
+SELECT
+	ROW_TO_JSON(DIRECTORS)
+FROM
+	DIRECTORS;
+
+SELECT
+	ROW_TO_JSON(T)
+FROM
+	(
+		SELECT
+			DIRECTOR_ID,
+			FIRST_NAME,
+			LAST_NAME,
+			NATIONALITY
+		FROM
+			DIRECTORS
+	) AS T;
+
+----------------------------------------------------------------------------------------------------
+-- Use json_agg to aggregate data
+-- PROBLEM: DISPLAT DIRECTOR_NAME, DIRECTOR_ID AND ALL MOVIES DONE BY A DIRECTOR, IN ONE PLACE
+-- [1] APPROACH 1
+SELECT
+	ROW_TO_JSON(T)
+FROM
+	(
+		SELECT
+			MV.MOVIE_NAME MOVIES,
+			CONCAT(DR.FIRST_NAME, ' ', DR.LAST_NAME) DIRECTORS
+		FROM
+			MOVIES MV
+			INNER JOIN DIRECTORS DR ON DR.DIRECTOR_ID = MV.DIRECTOR_ID
+	) T;
+
+-- [2] APPROACH 2
+SELECT
+	LAST_NAME,
+	(
+		SELECT
+			JSON_AGG(X) AS ALL_MOVIES
+		FROM
+			(
+				SELECT
+					MOVIE_NAME
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			) AS X
+	) AS ALL_MOVIES
+FROM
+	DIRECTORS
+ORDER BY
+	LAST_NAME;
+
+SELECT
+	MOVIE_NAME
+FROM
+	MOVIES
+WHERE
+	DIRECTOR_ID = 21;
+
+-- [3] APPROACH 3
+SELECT
+	DIRECTOR_ID,
+	FIRST_NAME,
+	LAST_NAME, -- (comma here, separating from next expression)
+	(
+		SELECT
+			JSON_AGG(X)
+		FROM
+			(
+				SELECT
+					MOVIE_NAME
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			) AS X
+	) AS ALL_MOVIES
+FROM
+	DIRECTORS
+ORDER BY
+	3;
+
+-- APPROACH[4]:
+SELECT
+	DIRECTOR_ID,
+	CONCAT(FIRST_NAME, ' ', LAST_NAME) AS DIRECTOR,
+	(
+		SELECT
+			JSON_AGG(MOVIE_DATA)
+		FROM
+			(
+				SELECT
+					MOVIE_NAME
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			) AS MOVIE_DATA
+	) AS ALL_MOVIES
+FROM
+	DIRECTORS
+ORDER BY
+	2;
+
+-- APPROACH[1]:
+-- DATA IS YIELD BY CONVERTING THE COLUMNS DIRECTOR AND MOVIE NAME INTO THE JSON FORMAT
+-- THIS IS MORE OF A ROW CENTRIC APPROACH
+-- THIS JUST GIVES THE MOVIE NAME AND CORESPONDING MOVIES
+-- IT DOES NOT GIVE RECORD OF ALL THE MOVIES MADE BY A DIRECTOR AT A SINGLE SPACE
+-- APPROACH[3]:
+-- DATA IS YIELD USING JSON_AGG FUNCTION
+-- WHICH COMBINES THE OUTPUT OF THE DATA, CONVERTS INTO JSON OBJECT, AND STORES INSIDE OF THE ARRAY
+-- APPROACH[4]:
+-- APPROACH[4] IS SAME AS APPROACH[4] BUT A BETTER ONE
+SELECT
+	DIRECTOR_ID,
+	FIRST_NAME,
+	LAST_NAME,
+	(
+		SELECT
+			JSON_AGG(X)
+		FROM
+			(
+				SELECT
+					MOVIE_NAME
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			) AS X
+	) AS ALL_MOVIES
+FROM
+	DIRECTORS;
+
+-- APPROACH [5]:
+SELECT
+	DR.DIRECTOR_ID,
+	CONCAT(DR.FIRST_NAME, ' ', DR.LAST_NAME) AS DIRECTORS,
+	(
+		SELECT
+			JSON_AGG(X)
+		FROM
+			(
+				SELECT
+					MV.MOVIE_NAME
+				FROM
+					MOVIES MV
+				WHERE
+					MV.DIRECTOR_ID = DR.DIRECTOR_ID
+			) AS X
+	)
+FROM
+	DIRECTORS DR;
+
+-- APPROACH [6]:
+SELECT
+	D.DIRECTOR_ID,
+	CONCAT(D.FIRST_NAME, ' ', D.LAST_NAME) AS DIRECTORS,
+	(
+		SELECT
+			JSON_AGG(M.MOVIE_NAME)
+		FROM
+			MOVIES M
+		WHERE
+			M.DIRECTOR_ID = D.DIRECTOR_ID
+	) AS ALL_MOVIES
+FROM
+	DIRECTORS D;
+
+-- DIFFERENCE BETWEEN APPROACH 6 AND APPROACH 5
+-- Why the Difference?
+-- IN APPROACH [6]:
+-- Direct Column Aggregation (Scalar):
+-- When you aggregate a single column value (a scalar), 
+-- JSON_AGG() wraps each value as-is into the array. In this case, you get an array of strings.
+-- IN APPROACH [5]:
+-- Row Aggregation (Record):
+-- When you aggregate rows (even if each row contains only one column), 
+-- PostgreSQL treats each row as a record and converts it into a JSON object. 
+-- Hence, you end up with an array of JSON objects where each object has keys matching the column names from the subquery.
+----------------------------------------------------------------------------------------------------
+-- Build a JSON array
+SELECT
+	JSON_BUILD_ARRAY(1, 2, 3, 4, 5, 'A');
+
+-- THIS METHOD TAKES EACH ARGUMENT AS ITS DATA TYPE
+SELECT
+	JSON_BUILD_OBJECT(1, 2, 3, 4, 5, 'A');
+
+-- THIS METHOD TAKES EACH ARGUMENT AS A STRING, IT DOES NOT DISTINGUISH BETWEEN THE TYPES
+SELECT
+	JSON_OBJECT('{A, B}', '{1, 2}');
+
+----------------------------------------------------------------------------------------------------
+-- Creating a document from data
+CREATE TABLE DIRECTOR_DOCS (ID SERIAL PRIMARY KEY, BODY JSONB);
+
+-- MOVIE ARRAY, NORMAL DATA
+SELECT
+	DIRECTOR_ID,
+	FIRST_NAME,
+	LAST_NAME,
+	DATE_OF_BIRTH,
+	NATIONALITY,
+	(
+		SELECT
+			JSON_AGG(MOVIE_NAME) AS ALL_MOVIES
+		FROM
+			MOVIES
+		WHERE
+			DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+	)
+FROM
+	DIRECTORS;
+
+-- MOVIE JSON, NORMAL DATA
+SELECT
+	DIRECTOR_ID,
+	FIRST_NAME,
+	LAST_NAME,
+	DATE_OF_BIRTH,
+	NATIONALITY,
+	(
+		SELECT
+			JSON_AGG(X) AS ALL_MOVIES
+		FROM
+			(
+				SELECT
+					MOVIE_NAME
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			) AS X
+	)
+FROM
+	DIRECTORS;
+
+-- MOVIE JSON, JSON DATA
+SELECT
+	ROW_TO_JSON(DIRECTORS_DATA)
+FROM
+	(
+		SELECT
+			DIRECTOR_ID,
+			CONCAT(FIRST_NAME, ' ', LAST_NAME) DIRECTOR,
+			DATE_OF_BIRTH,
+			NATIONALITY,
+			(
+				SELECT
+					JSON_AGG(X) AS ALL_MOVIES
+				FROM
+					(
+						SELECT
+							MOVIE_NAME
+						FROM
+							MOVIES
+						WHERE
+							DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+					) AS X
+			)
+		FROM
+			DIRECTORS
+	) AS DIRECTORS_DATA;
+
+-- MOVIE ARRAY, JSON DATA
+SELECT
+	ROW_TO_JSON(DIRECTOR_DATA)
+FROM
+	(
+		SELECT
+			DIRECTOR_ID,
+			CONCAT(FIRST_NAME, ' ', LAST_NAME) DIRECTOR,
+			DATE_OF_BIRTH,
+			NATIONALITY,
+			(
+				SELECT
+					JSON_AGG(MOVIE_NAME) AS ALL_MOVIES
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			)
+		FROM
+			DIRECTORS
+	) AS DIRECTOR_DATA;
+
+-- INSERTION THE SAME
+-- TURNING THE DATA INTO THE JSON DOCUMENT
+INSERT INTO
+	DIRECTOR_DOCS (BODY)
+SELECT
+	ROW_TO_JSON(DIRECTOR_DATA)
+FROM
+	(
+		SELECT
+			DIRECTOR_ID,
+			CONCAT(FIRST_NAME, ' ', LAST_NAME) DIRECTOR,
+			DATE_OF_BIRTH,
+			NATIONALITY,
+			(
+				SELECT
+					JSON_AGG(MOVIE_NAME) AS ALL_MOVIES
+				FROM
+					MOVIES
+				WHERE
+					DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+			)
+		FROM
+			DIRECTORS
+	) AS DIRECTOR_DATA;
+
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS;
+
+----------------------------------------------------------------------------------------------------
+-- Null Values in JSON documents
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS;
+
+SELECT
+	JSONB_ARRAY_ELEMENTS(BODY -> 'all_movies')
+FROM
+	DIRECTOR_DOCS
+WHERE
+	(BODY -> 'all_movies') IS NOT NULL;
+
+DELETE FROM DIRECTOR_DOCS;
+
+INSERT INTO
+	DIRECTOR_DOCS (BODY)
+SELECT
+	ROW_TO_JSON(A)::JSONB
+FROM
+	(
+		SELECT
+			DIRECTOR_ID,
+			FIRST_NAME,
+			LAST_NAME,
+			DATE_OF_BIRTH,
+			NATIONALITY,
+			(
+				SELECT
+					CASE COUNT(X)
+						WHEN 0 THEN '[]'
+						ELSE JSON_AGG(X)
+					END AS "all_movies"
+				FROM
+					(
+						SELECT
+							MOVIE_NAME
+						FROM
+							MOVIES
+						WHERE
+							DIRECTOR_ID = DIRECTORS.DIRECTOR_ID
+					) AS X
+			)
+		FROM
+			DIRECTORS
+	) AS A;
+
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS;
+
+SELECT
+	JSONB_ARRAY_ELEMENTS(BODY -> 'all_movies')
+FROM
+	DIRECTOR_DOCS;
+
+----------------------------------------------------------------------------------------------------
+-- Getting information from JSON documents
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS;
+
+SELECT
+	*,
+	JSONB_ARRAY_LENGTH(BODY -> 'all_movies') AS TOTAL_MOVIES
+FROM
+	DIRECTOR_DOCS
+ORDER BY
+	JSONB_ARRAY_LENGTH(BODY -> 'all_movies') DESC;
+
+SELECT
+	*,
+	JSONB_OBJECT_KEYS(BODY)
+FROM
+	DIRECTOR_DOCS;
+
+SELECT
+	J.KEY,
+	J.VALUE
+FROM
+	DIRECTOR_DOCS,
+	JSONB_EACH(DIRECTOR_DOCS.BODY) J;
+
+SELECT
+	J.*
+FROM
+	DIRECTOR_DOCS,
+	JSONB_TO_RECORD(DIRECTOR_DOCS.BODY) J (
+		DIRECTOR_ID INT,
+		FIRST_NAME VARCHAR(255),
+		NATIONALITY VARCHAR(100)
+	);
+
+----------------------------------------------------------------------------------------------------
+-- The Existence Operator
+-- ? operator
+-- ? operator expects both sides to be texts
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	BODY -> 'first_name' ? 'James';
+
+----------------------------------------------------------------------------------------------------
+-- The Containment Operator
+-- FIND ALL FIRST_NAME =  'JOHN'
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	BODY @> '{"first_name": "John"}';
+
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	BODY @> '{"director_id": 1}';
+
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	BODY -> 'all_movies' @> '[{"movie_name": "Toy Story"}]';
+
+----------------------------------------------------------------------------------------------------
+-- JSON search with PostgreSQL functions
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	BODY ->> 'first_name' LIKE 'J%';
+
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	(BODY ->> 'director_id')::INTEGER > 2;
+
+SELECT
+	*
+FROM
+	DIRECTOR_DOCS
+WHERE
+	(BODY ->> 'director_id')::INTEGER IN (1, 2, 3, 4, 5, 10);

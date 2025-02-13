@@ -1,0 +1,777 @@
+CREATE INDEX IDX_ORDERS_ORDER_DATE ON ORDERS (ORDER_DATE);
+
+CREATE INDEX IDX_ORDERS_SHIP_CITY ON ORDERS (SHIP_CITY);
+
+CREATE INDEX IDX_ORDERS_CUSTOMER_ID_ORDER_ID ON ORDERS (CUSTOMER_ID, ORDER_ID);
+
+-- WHILE CREATING MULTI-COLUMN INDEX YOU SHOULD PLACE THE MOST SELECTIVE COLUMNS FIRST.
+-- POSTGRESQL WILL CONSIDER A MULTI-COLUMN INEX FROM THE FIRST COLUMN ONWARDS
+-- SO IF THE FIRST COLUMNS ARE MORE SELECTVE, THE INDEX ACCESS METHOD WILL BE THE CHEAPEST
+----------------------------------------------------------------------------------------------------
+-- Create unique indexes
+-- COMBINED VALUES IN THESE COLUMNS CAN NOT BE DUPLICATED IN MULTIPLE ROWS
+CREATE UNIQUE INDEX IDX_U_PRODUCTS_PRODUCT_ID ON PRODUCTS (PRODUCT_ID);
+
+CREATE UNIQUE INDEX IDX_U_EMPLOYEES_EMPLOYEE_ID ON EMPLOYEES (EMPLOYEE_ID);
+
+CREATE UNIQUE INDEX IDX_U_ORDERS_ORDER_ID_CUSTOMER_ID ON ORDERS (ORDER_ID, CUSTOMER_ID);
+
+-- IN THE CASE WHERE THERE IS AN INDEX TO BE CREATED ON MULTIPLE COLUMNS, THEN PUT PRIMARY KEY AS FIRST COLUMN
+CREATE UNIQUE INDEX IDX_U_EMPLOYEES_EMPLOYEE_ID_HIRE_DATE ON EMPLOYEES (EMPLOYEE_ID, HIRE_DATE);
+
+SELECT
+	*
+FROM
+	EMPLOYEES;
+
+INSERT INTO
+	EMPLOYEES (EMPLOYEE_ID, FIRST_NAME, LAST_NAME)
+VALUES
+	(1, 'A', 'B');
+
+CREATE TABLE T1 (ID SERIAL PRIMARY KEY, TAG TEXT);
+
+SELECT
+	*
+FROM
+	T1;
+
+CREATE UNIQUE INDEX IDX_U_T1_TAG ON T1 (TAG);
+
+INSERT INTO
+	T1 (TAG)
+VALUES
+	('A'),
+	('B');
+
+----------------------------------------------------------------------------------------------------
+-- List all indexes
+SELECT
+	*
+FROM
+	PG_INDEXES
+WHERE
+	SCHEMANAME = 'public';
+
+-- INDEXES OF A TABLE
+SELECT
+	*
+FROM
+	PG_INDEXES
+WHERE
+	TABLENAME = 'orders'
+ORDER BY
+	TABLENAME,
+	INDEXNAME
+	----------------------------------------------------------------------------------------------------
+	-- Size of the table index
+SELECT
+	PG_SIZE_PRETTY(PG_INDEXES_SIZE('ORDERS'));
+
+SELECT
+	COUNT(*)
+FROM
+	ORDERS;
+
+SELECT
+	PG_SIZE_PRETTY(PG_INDEXES_SIZE('suppliers'));
+
+CREATE INDEX IDX_SUPPLIERS_REGION ON SUPPLIERS (REGION);
+
+CREATE UNIQUE INDEX IDX_U_SUPPLIERS_SUPPLIER_ID ON SUPPLIERS (SUPPLIER_ID);
+
+----------------------------------------------------------------------------------------------------
+-- List counts of all indexes
+SELECT
+	*
+FROM
+	PG_STAT_ALL_INDEXES
+ORDER BY
+	RELNAME;
+
+----------------------------------------------------------------------------------------------------
+-- Drop a index
+DROP INDEX idx_suppliers_region;
+
+----------------------------------------------------------------------------------------------------
+-- SQL Statement execution process
+/*
+PARSER - HANDLES TEXTUAL FORM OF A STATEMENT AND VERIFIES WHETHER IT IS CORRECT OR NOT
+REWRITER - APPLY SYNTACTIC RULES TO REWRITE ORIGINAL SQL STATEMENT
+OPTIMIZER - FIND VERY FASTEST PATH TO DATA THAT STATEMENT NEEDS
+EXECUTOR - RESPONSIBLE FOR EFFECTIVELY GOING TO STORAGE AND ALTERING DATA AND GETS PHYSICAL ACCESS TO DATA
+*/
+
+----------------------------------------------------------------------------------------------------
+-- The query optimizer
+/*
+HOW TO ACCESS DATA AS QUICKLY AS POSSIBLE
+1. COST - SHOULD BE LOWEST
+2. THREAD - AVAILABLE FROM POSTGRESQL VERSION 9.6 ONWARDS
+3. NODES - STATEMENT DIVIDE INTO ACTIONS THAT ARE EXECUTED BY NODES SEPERATELY
+4. NODES TYPES
+*/
+
+----------------------------------------------------------------------------------------------------
+-- Optimizer node types
+/*
+NODES ARE AVAILABLE FOR - EVERY OPERATIONS
+						   EVERY ACCESS METHODS
+
+NODES ARE STACKABLE
+PARENT NODE - COST ASSOCIATED
+	CHILD NODE 1
+		CHILD NODE 2
+			.....
+SELECT * FROM PG_AM;
+
+----------------------------------------------------------------------------------------------------
+-- Sequential Nodes
+TYPES OF NODES - SEQUENTIAL SCAN
+				- INDEX SCAN, INDEX ONLY SCAN, BITMAP INDEX SCAN
+				- NESTED LOOP, HASH JOIN, MERGE JOIN					
+				- GATHER AND MERGE PARALLEL NODES
+*/
+
+----------------------------------------------------------------------------------------------------
+
+-- SEQUENTIAL NODES
+/*
+- DEFAULT WHEN NO OTHER VALUABLE ALTERNATIVE
+- READ FROM BEGINING OF DATASET
+- FILTERING CLAUSE IS NOT VERY LIMIING SUCH THAT END RESULT WILL GET ALMOST WHOLE TABLE CONTENT	
+*/
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS;
+	
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	ORDER_ID IS NOT NULL;
+----------------------------------------------------------------------------------------------------
+-- INDEX NODES
+/*
+- INDEX IS USED TO ACCESS THE DATASET
+- DATA FILE AND INDEX FILES ARE SEPERATED BUT THEY ARE NEARBY
+- INDEX NODES TYPES - 
+INDEX SCAN - INDEX -> SEEK THE TUPLES -> READ DATA AGAIN
+INDEX ONLY SCAN - REQUESTED INDEX COLUMNS ONLY -> DIRECTLY GET DATA FROM INDEX FILE
+BITMAP INDEX SCAN - BUILDS A MEMORY BITMAP FOR TUPLES THAT SATISFY STATEMENT CLAUSES
+*/
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	ORDER_ID =1;
+-- "Index Scan using idx_u_orders_order_id_customer_id on orders  (cost=0.28..8.29 rows=1 width=90)"
+EXPLAIN
+SELECT
+	ORDER_ID
+FROM
+	ORDERS
+WHERE
+	ORDER_ID =1;
+-- "Index Only Scan using idx_u_orders_order_id_customer_id on orders  (cost=0.28..8.29 rows=1 width=2)"
+
+----------------------------------------------------------------------------------------------------
+-- Join Nodes
+/*
+- USED WHEN JOINING THE TABLES
+- WHEN JOINING LARGE NUMBER OF TABLES, GENETIC QUERY OPTIMIZER SETTINGS MAY AFFECT WHAT COMBINATIONS OF JOINS 
+  ARE CONSIDERED
+- JOIN NODES TYPES -
+HASH JOIN - INNER TABLE - BUILD HASH TABLE FROM INNER TABLE, KEYED BY JOIN KEY
+			OUTER TABLE - THEN SCAN OUTER TABLE, CHECKING IF A CORRESPONDING VALUE IS PRESENT
+MERGE JOIN - JOIN TWO CHILDREN ALREADY SORTED BY THEIR SHARED JOIN KEY. THIS ONLY SCANS RELATION ONCE,
+			BUT BOTH INPUTS NEED TO BE SORTED BY JOIN KEYS FIRST
+NESTED LOOP - FOR EACH ROW IN OUTER TABLE, ITERATE THROUGH ALL ROWS IN INNER TABLE AND SEE IF THEY MATCH THE
+			  JOIN CONDITION. IF INNER RELATION CAN BE SCANNED WITH AN INDEX, THAT CAN IMPROVE PERFORMANCE
+			  OF NESTED LOOP JOIN
+*/
+
+SHOW work_mem;
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+	NATURAL JOIN CUSTOMERS;
+
+----------------------------------------------------------------------------------------------------
+-- Index Types - B-Tree Index
+/*
+- DEFAULT INDEX
+- SELF-BALANCING TREE - SELECT, INSERT, DELETE, SEQUENTIAL ACCESS IN LOGARITHMIC TIME
+- CAN BE USED FOR MOST OPERATORS AND COLUMN TYPES
+- SUPPORT UNIQUE CONDITION
+- NORMALLY USED TO BUILD PRIMARY KEY INDEXES
+- USED WHEN COLUMNS INVOLVE OPERATORS - <, >, <=, >= , =, BETWEEN, IN, IS NULL, IS NOT NULL
+- USED FOR PATTERN MATCHING
+*/
+
+----------------------------------------------------------------------------------------------------
+-- HASH INDEX
+/*
+- USED ONLY FOR EQUALITY OPERATORS - =
+- NOT FOR RANGE OR DISEQUALITY OPERATORS
+- LARGER THAN B-TREE INDEXES
+*/
+
+CREATE INDEX IDX_H_ORDERS_ORDER_DATE ON ORDERS USING HASH (ORDER_DATE);
+
+SELECT
+	*
+FROM
+	ORDERS;
+	
+ORDER BY
+	ORDER_DATE;
+
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	ORDER_DATE = '2020-01-01';
+----------------------------------------------------------------------------------------------------
+-- BRIN INDEX
+/*
+- BLOCK RANGE INDEX
+- DATA BLOCK - MIN TO MAX VALUE
+- SMALLER INDEX
+- LESS COSTLY TO MAINTAIN THAN B-TREE INDEX
+- CAN BE USED ON LARGE TABLE
+- USE LINEAR SORT ORDER 
+*/
+
+----------------------------------------------------------------------------------------------------
+-- GIN INDEX
+/*
+- GENERALIZED INVERTED INDEX
+- POINT TO MULTIPLE TUPLES
+- USED FOR ARRAY TYPE DATA
+- USED FOR FULL TEXT SERACH
+- USEFUL WHEN MULTIPLE VALUES ARE STORED IN A SINGLE COLUMN
+*/
+
+----------------------------------------------------------------------------------------------------
+-- EXPLAIN STATEMENT
+/*
+- SHOWS EXECUTION PLAN OF QUERY
+- IT WON'T EXECUTE STATEMENT
+- SHOWS EXECUTION NODES THAT EXECUTOR USES
+- RETURNS EXECUTION NODES, LOWEST COST, ROWS, WIDTH
+*/EXPLAIN
+SELECT
+	*
+FROM
+	SUPPLIERS
+WHERE
+	SUPPLIER_ID =1;
+	
+EXPLAIN
+SELECT
+	COMPANY_NAME
+FROM
+	SUPPLIERS
+ORDER BY
+	COMPANY_NAME;
+
+----------------------------------------------------------------------------------------------------
+-- EXPLAIN output options
+EXPLAIN (FORMAT JSON)
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	ORDER_ID = 1;
+
+----------------------------------------------------------------------------------------------------
+-- Using EXPLAIN ANALYZE
+/*
+- RETURNS BEST PLAN TO EXECUTE QUERY
+- REPORTS BACK SOME STATISTICAL INFORMATION
+*/
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	ORDER_ID = 1
+ORDER BY
+	ORDER_ID;
+
+----------------------------------------------------------------------------------------------------
+-- Understanding query cost model
+CREATE TABLE t_big (
+	id SERIAL,
+	name TEXT
+);
+
+INSERT INTO
+	T_BIG (NAME)
+SELECT
+	'Adam'
+FROM
+	GENERATE_SERIES(1, 2000000);
+	
+INSERT INTO
+	T_BIG (NAME)
+SELECT
+	'Linda'
+FROM
+	GENERATE_SERIES(1, 2000000);
+	
+EXPLAIN
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	ID = 12345;
+
+SHOW MAX_PARALLEL_WORKERS_PER_GATHER;
+
+SET
+	MAX_PARALLEL_WORKERS_PER_GATHER = 2;
+
+SELECT
+	PG_RELATION_SIZE('t_big') / 8192.0;
+
+SHOW SEQ_PAGE_COST;
+
+SHOW CPU_TUPLE_COST;
+
+SHOW CPU_OPERATOR_COST;
+
+-- pg_relation_size('t_big') / 8192.0 * seq_page_cost + total_records * cpu_tuple_cost + total_records * cpu_operator_cost;
+-- EXPLAIN SELECT * FROM T_BIG WHERE ID = 12345; cost in this is equvivalent to below: 
+SELECT
+	21622.000000000000 * 1 + 4000000 * 0.01 + 4000000 * 0.0025;
+
+----------------------------------------------------------------------------------------------------
+-- INDEX ARE NOT FREE
+SELECT
+	PG_SIZE_PRETTY(PG_INDEXES_SIZE('t_big'));
+
+SELECT
+	PG_SIZE_PRETTY(PG_TOTAL_RELATION_SIZE('t_big'));
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	ID = 123456;
+
+CREATE INDEX IDX_T_BIG_ID ON T_BIG (ID);
+
+SHOW MAX_PARALLEL_MAINTENANCE_WORKERS;
+
+----------------------------------------------------------------------------------------------------
+-- Indexes for sorted output
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_BIG
+ORDER BY
+	ID
+LIMIT
+	20;
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_BIG
+ORDER BY
+	NAME
+LIMIT
+	20;
+
+EXPLAIN
+SELECT
+MIN(ID),
+MAX(ID)
+FROM
+	T_BIG;
+
+EXPLAIN
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	ID = 20
+	OR ID = 40;
+
+----------------------------------------------------------------------------------------------------
+-- Using multiple indexes on a single query
+EXPLAIN
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	ID = 20
+	OR ID = 40;
+
+CREATE INDEX idx_t_big_name ON t_big (name);
+
+EXPLAIN
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	NAME = 'Adam'
+LIMIT
+	10;
+
+EXPLAIN
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	NAME = 'Adam'
+	OR NAME = 'Linda';
+
+EXPLAIN
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	NAME = 'Adam1'
+	OR NAME = 'Linda1';
+
+----------------------------------------------------------------------------------------------------
+-- ORGANIZED VS RANDOM DATA
+SELECT
+	*
+FROM
+	T_BIG
+ORDER BY
+	ID
+LIMIT
+	10;
+
+EXPLAIN (
+	ANALYZE TRUE,
+	BUFFERS TRUE,
+	TIMING TRUE
+)
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	ID < 10000;
+
+CREATE TABLE T_BIG_RANDOM AS
+SELECT
+	*
+FROM
+	T_BIG
+ORDER BY
+	RANDOM();
+
+CREATE INDEX IDX_T_BIG_RANDOM_ID ON T_BIG_RANDOM (ID);
+
+SELECT
+	*
+FROM
+	T_BIG_RANDOM
+LIMIT
+	10;
+
+VACUUM ANALYZE T_BIG_RANDOM;
+
+EXPLAIN (
+	ANALYZE TRUE,
+	BUFFERS TRUE,
+	TIMING TRUE
+)
+SELECT
+	*
+FROM
+	T_BIG_RANDOM
+WHERE
+	ID < 10000;
+
+SELECT
+	TABLENAME,
+	ATTNAME,
+	CORRELATION
+FROM
+	PG_STATS
+WHERE
+	TABLENAME IN ('t_big', 't_big_random')
+ORDER BY
+	1,
+	2;
+
+----------------------------------------------------------------------------------------------------
+-- INDEX ONLY SCAN
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_BIG
+WHERE
+	ID = 123456;
+
+EXPLAIN
+ANALYZE
+SELECT
+	ID
+FROM
+	T_BIG
+WHERE
+	ID = 123456;
+
+----------------------------------------------------------------------------------------------------
+-- PARTIAL INDEXES
+SELECT
+	PG_SIZE_PRETTY(PG_INDEXES_SIZE('t_big'));
+
+DROP INDEX IDX_T_BIG_NAME;
+
+CREATE INDEX IDX_P_T_BIG_NAME ON T_BIG (NAME)
+WHERE
+	NAME NOT IN ('Adam', 'Linda');
+
+SELECT
+	*
+FROM
+	CUSTOMERS;
+
+UPDATE CUSTOMERS
+SET
+	IS_ACTIVE = 'N'
+WHERE
+	CUSTOMER_ID IN ('ALFKI', 'ANATR');
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	CUSTOMERS
+WHERE
+	IS_ACTIVE = 'N';
+
+CREATE INDEX IDX_P_CUSTOMERS_IS_ACTIVE ON CUSTOMERS (IS_ACTIVE)
+WHERE
+	IS_ACTIVE = 'N';
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	CUSTOMERS
+WHERE
+	IS_ACTIVE = 'N';
+
+----------------------------------------------------------------------------------------------------
+-- EXPRESSION INDEX
+CREATE TABLE T_DATES AS
+SELECT
+	D,
+	REPEAT(MD5(D::TEXT), 10) AS PADDING
+FROM
+	GENERATE_SERIES(
+		TIMESTAMP '1800-01-01',
+		TIMESTAMP '2100-01-01',
+		INTERVAL '1 DAY'
+	) AS S (D);
+
+VACUUM
+ANALYZE T_DATES;
+
+SELECT
+	COUNT(*)
+FROM
+	T_DATES;
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_DATES
+WHERE
+	D BETWEEN '2001-01-01' AND '2001-01-31';
+
+CREATE INDEX IDX_T_DATES_D ON T_DATES (D);
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_DATES
+WHERE
+	D BETWEEN '2001-01-01' AND '2001-01-31';
+
+ANALYZE T_DATES;
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_DATES
+WHERE
+	EXTRACT(
+		DAY
+		FROM
+			D
+	) = 1;
+
+CREATE INDEX IDX_EXPR_T_DATES_D ON T_DATES (
+	EXTRACT(
+		DAY
+		FROM
+			D
+	)
+);
+
+ANALYZE T_DATES;
+
+EXPLAIN
+ANALYZE
+SELECT
+	*
+FROM
+	T_DATES
+WHERE
+	EXTRACT(
+		DAY
+		FROM
+			D
+	) = 1;
+
+----------------------------------------------------------------------------------------------------
+-- ADDING DATA WHILE INDEXING
+CREATE INDEX CONCURRENTLY IDX_T_BIG_NAME ON T_BIG (NAME);
+
+SELECT
+	OID,
+	RELNAME,
+	RELPAGES,
+	RELTUPLES,
+	I.INDISUNIQUE,
+	I.INDISCLUSTERED,
+	I.INDISVALID,
+	PG_CATALOG.PG_GET_INDEXDEF (I.INDEXRELID, 0, TRUE)
+FROM
+	PG_CLASS AS C
+	JOIN PG_INDEX AS I ON C.OID = I.INDRELID
+WHERE
+	C.RELNAME = 't_big';
+
+----------------------------------------------------------------------------------------------------
+-- INVALIDATE INDEX
+SELECT
+	OID,
+	RELNAME,
+	RELPAGES,
+	RELTUPLES,
+	I.INDISUNIQUE,
+	I.INDISCLUSTERED,
+	I.INDISVALID,
+	PG_CATALOG.PG_GET_INDEXDEF (I.INDEXRELID, 0, TRUE)
+FROM
+	PG_CLASS AS C
+	JOIN PG_INDEX AS I ON C.OID = I.INDRELID
+WHERE
+	C.RELNAME = 'orders';
+
+SELECT
+	*
+FROM
+	ORDERS;
+
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	SHIP_COUNTRY = 'USA';
+
+CREATE INDEX IDX_ORDERS_SHIP_COUNTRY ON ORDERS (SHIP_COUNTRY);
+
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	SHIP_COUNTRY = 'USA';
+
+UPDATE PG_INDEX
+SET
+	INDISVALID = FALSE
+WHERE
+	INDEXRELID = (
+		SELECT
+			OID
+		FROM
+			PG_CLASS
+		WHERE
+			RELKIND = 'i'
+			AND RELNAME = 'idx_orders_ship_country'
+	);
+
+EXPLAIN
+SELECT
+	*
+FROM
+	ORDERS
+WHERE
+	SHIP_COUNTRY = 'USA';
+
+----------------------------------------------------------------------------------------------------
+-- REBUILD INDEX
+REINDEX INDEX IDX_ORDERS_CUSTOMER_ID_ORDER_ID;
+
+REINDEX (VERBOSE) INDEX IDX_ORDERS_CUSTOMER_ID_ORDER_ID;
+
+REINDEX (VERBOSE) TABLE ORDERS;
+
+REINDEX (VERBOSE) SCHEMA PUBLIC;
+
+REINDEX (VERBOSE) DATABASE NORTHWIND;
+
+BEGIN;
+
+REINDEX INDEX IDX_ORDERS_CUSTOMER_ID_ORDER_ID;
+
+REINDEX TABLE ORDERS;
+
+END;
+
+REINDEX (VERBOSE) TABLE CONCURRENTLY ORDERS;
